@@ -1,1 +1,73 @@
+spring:
+  main:
+    web-application-type: reactive
+
+  cloud:
+    gateway:
+      routes:
+        - id: booking-orchestrator
+          uri: lb://booking-orchestrator
+          predicates:
+            - Path=/booking/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: bookingOrchCB
+                fallbackUri: forward:/fallback/booking-orchestrator
+
+        - id: user-auth
+          uri: lb://user-auth-service
+          predicates:
+            - Path=/user-auth/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: userAuthCB
+                fallbackUri: forward:/fallback/user-auth
+
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+        add-to-simple-url-handler-mapping: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      userAuthCB:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+      bookingOrchCB:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,env,beans
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
 
